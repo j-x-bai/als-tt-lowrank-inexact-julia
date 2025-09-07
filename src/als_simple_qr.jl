@@ -1,19 +1,27 @@
 using IterativeSolvers
 using LinearAlgebra
 
-function als_2d(B::AbstractMatrix, r::Number;
+function als_2d_qr(B::AbstractMatrix, r::Number;
                 X1 = nothing, X2 = nothing,
                 outer_maxiters::Int=100, outer_tol::Float64=1e-8,
                 # inner_method::Symbol=:cg, 
-                inner_maxiters::Int=100, inner_tol::Float64=1e-6)
+                inner_maxiters::Int=100, inner_tol::Float64=1e-8)
     n, m = size(B)
     
     if X1 === nothing
-        X1 = randn(n, r)
+        QR1 = qr(randn(n, r))
+        X1 = Matrix(QR1.Q)
+    else
+        QR1 = qr(X1)
+        X1 = Matrix(QR1.Q)
     end
 
     if X2 === nothing
-        X2 = randn(m, r)
+        QR2 = qr(randn(m, r))
+        X2 = Matrix(QR2.Q)
+    else
+        QR2 = qr(X2)
+        X2 = Matrix(QR2.Q)
     end
 
     error = zeros(outer_maxiters)
@@ -22,15 +30,19 @@ function als_2d(B::AbstractMatrix, r::Number;
     Y2 = zeros(m, r)
     converged_als = false
 
+    # id = Matrix{Float64}(I, rank, rank)
+  
     for s in 1:outer_maxiters
-
+        
         blocksize1 = ceil(Int, n / num_threads)
         Threads.@threads for core in 1:num_threads
             for j = (core-1)*blocksize1 +1 : min(core*blocksize1, n)
                 Y1[j, :] = cg(X2' * X2, (X2' * B')[:, j]; abstol=inner_tol, maxiter=inner_maxiters)
             end
         end
-        X1 = Y1
+
+        QR1 = qr(Y1)
+        X1 = Matrix(QR1.Q)
 
         blocksize2 = ceil(Int, m / num_threads)
         Threads.@threads for core in 1:num_threads
@@ -38,7 +50,10 @@ function als_2d(B::AbstractMatrix, r::Number;
                 Y2[j, :] = cg(X1' * X1, (X1' * B)[:, j]; abstol=inner_tol, maxiter=inner_maxiters)
             end
         end
-        X2 = Y2
+        QR2 = qr(Y2)
+
+        X2 = Matrix(QR2.Q)
+        X1 = X1 * (QR2.R')
 
         error[s] = norm(X1 * X2' - B, 2)
         if error[s] <= outer_tol
