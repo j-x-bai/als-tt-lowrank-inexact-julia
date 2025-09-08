@@ -5,7 +5,7 @@ include(joinpath(@__DIR__, "../src/als_simple_qr.jl"))
 
 num_threads = Threads.nthreads()
 
-matrix_dirs = readdir(joinpath(@__DIR__, "../data/matrix"), join=true)
+matrix_dirs = readdir(joinpath(@__DIR__, "../data/new_matrix"), join=true)
 println("successful read matrix dirs: ", matrix_dirs)
 
 for dir in matrix_dirs
@@ -18,8 +18,8 @@ for dir in matrix_dirs
         matrix_files = filter(f -> endswith(f, ".jld2"), readdir(dir, join=true))
         println("matrix_files: ", matrix_files)
 
-        isdir("data/results_qr") || mkpath("../data/results_qr")
-        isdir("data/results_qr/results_qr_$(size_str)") || mkpath("data/results_qr/results_qr_$(size_str)")
+        isdir("../data/results_qr") || mkpath("../data/results_qr")
+        isdir("../data/results_qr/results_qr_$(size_str)") || mkpath("../data/results_qr/results_qr_$(size_str)")
 
 
         for file in matrix_files
@@ -31,10 +31,10 @@ for dir in matrix_dirs
             n, m = size(B)
             @assert size_n == n && size_m == m
 
-            isdir("data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)") || mkpath("data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)")
+            isdir("../data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)") || mkpath("../data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)")
 
-            if isfile("data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)/qr_cond_$(cond_str).csv")
-                results = CSV.read("data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)/cond_$(cond_str).csv", DataFrame)
+            if isfile("../data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)/qr_cond_$(cond_str).csv")
+                results = CSV.read("../data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)/cond_$(cond_str).csv", DataFrame)
             else
                 results = DataFrame(
                     threads = Int[],
@@ -122,8 +122,8 @@ for dir in matrix_dirs
                                 ))
 
                                 
-                                CSV.write("data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)/qr_cond_$(cond_str).csv", results)
-                                open("data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)/qr_cond_$(cond_str).tex", "w") do io
+                                CSV.write("../data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)/qr_cond_$(cond_str).csv", results)
+                                open("../data/results_qr/results_qr_$(size_str)/qr_cond_$(cond_str)/qr_cond_$(cond_str).tex", "w") do io
 
                                     println(io, "\\documentclass{article}")
                                     println(io, "\\usepackage[a4paper,landscape,margin=0.5cm]{geometry}")
