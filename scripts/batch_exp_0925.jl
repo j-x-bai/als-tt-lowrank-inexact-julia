@@ -3,7 +3,7 @@ using Plots
 using Printf
 using Measures
 include("../src/als_0925.jl")
-include("../src/plots_0925.jl")
+include("../src/plots_0926.jl")
 plotlyjs()
 
 # data = load("data/matrix/10x10/10x10_cond9.24.jld2")
