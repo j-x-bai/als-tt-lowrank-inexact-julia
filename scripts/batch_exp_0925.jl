@@ -17,7 +17,7 @@ println("Julia is currently using threads: ", Threads.nthreads())
 
 num_threads = Threads.nthreads()
 
-matrix_dirs = readdir(joinpath(@__DIR__, "../data/new_matrix"), join=true)
+matrix_dirs = readdir(joinpath(@__DIR__, "../data/test_matrix"), join=true)
 println("successful read matrix dirs: ", matrix_dirs)
 
 for dir in matrix_dirs
@@ -38,7 +38,7 @@ for dir in matrix_dirs
             # tol_num = 1
 
             for r in ranks
-                B_svdt, svd_error, svd_ratios, singular_values = svd_truncated(B, r)
+                B_svdt, svd_error, svd_ratios, singular_values, SigmaV, square_sigma_ratio = svd_truncated(B, r)
                 save_singular_values_csv(r, singular_values, svd_ratios, size(B), cond_B)
                 resvec = Vector{ALSResult}(undef, tol_num)
                 for k in range(1, tol_num)
@@ -49,8 +49,8 @@ for dir in matrix_dirs
                     for j in range(1, tol_num+1-k)
                         inner_tol = 10.0^(-13 + k+j-1) 
                         vec_inner_tol[j] = inner_tol
-                        res = als_2d_qr(B, r, B_svdt;
-                                    outer_tol=outer_tol, inner_tol=inner_tol)
+                        res = als_2d_qr(B, r, cond_B, square_sigma_ratio, B_svdt, SigmaV;
+                                    outer_tol=outer_tol, inner_abstol=inner_tol, inner_reltol=0.0)
                         resvec_inner[j] = res
                         vec_outer_iters[j] = res.outer_iters
                         if j == 1
