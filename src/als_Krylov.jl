@@ -16,7 +16,7 @@ using Measures
 
 #     for t in 1:n_outer
 #         p = plot(yscale = :log10, xlabel = "CG iteration", ylabel = "Residual 2-norm at outer iteration $s",
-#                  title = "outer $t", legend = :none)
+#                  title = "outer $t")
 #         ncols_cur = length(res_hist[t])
 #         for j in 1:ncols_cur
 #             res = res_hist[t][j]
@@ -26,6 +26,10 @@ using Measures
 #         end
 #         plot!(plt[t], p)  
 #     end
+#     rankstr = " "
+#     matstr = " "
+#     condstr = " " 
+#     outertolstr = " "
 #     dir = "data/results_Krylov_cg_convergence/$(name)/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
 #     mkpath(dir)
 #     outpath_html = "$(dir)/$(outfile)_als_rank_$(r).html"
