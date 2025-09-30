@@ -31,6 +31,7 @@ plotlyjs()
 function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult}, 
                              svd_ratios::Vector{Float64},singular_values::Vector{Float64},
                              size_B::Tuple{Int, Int}, cond_B::Float64;
+                             cg_method = "IterativeSolvers_cg",
                              names = ["outer=$(resvec[i].outer_tol), inner=$(resvec[i].inner_abstol)" for i in range(1, length(resvec))],
                              outfile = "exact")
 
@@ -38,7 +39,7 @@ function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult},
 
     lay = @layout [grid(K, 6); T{0.05h}]
     p = plot(layout=lay, size=(7000, K*700), margin=20mm, left_margin=30mm, 
-             plot_title="Exact ALS Rank Panel | matrix size = $(size_B) cond = $cond_B ")
+             plot_title="Exact ALS Rank Panel | matrix size = $(size_B) cond = $cond_B |  rank = $r |  method = $cg_method ")
 
     idx(row, col) = (row-1)*6 + col
     last_ratio = zeros(K)
@@ -57,7 +58,7 @@ function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult},
         y8 = res.upper_error_bound
 
         plot!(p[idx(j,1)], x, y1; label="Frobenius, original results", yscale=:log10, legend=false,
-              xlabel="Outer iteration", title="Original error in Frobenius norm vs cond_B * sin(max_theta) in 2-norm at each outer iteration($(names[j]))")
+              xlabel="Outer iteration", title="Original error in Frobenius norm vs cond_B * sin(max_theta) * B_fnorm in 2-norm at each outer iteration($(names[j]))")
         plot!(p[idx(j,1)], x, y8;label="Upper error bound in opnorm-2")
 
         # Compute error ratio 
@@ -147,13 +148,13 @@ function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult},
     condstr = @sprintf("cond%.2f", cond_B)
     rankstr = "rank_$(r)"
     
-    dir = "data/results_pdf/$(matstr)_$(condstr)/$(rankstr)"
+    dir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)"
     mkpath(dir) 
-    for res in resvec
-        outertolstr = @sprintf("outertol_%1.0e", res.outer_tol)
-        outertoldir = "data/results_pdf/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
-        mkpath(outertoldir)
-    end
+    # for res in resvec
+    #     outertolstr = @sprintf("outertol_%1.0e", res.outer_tol)
+    #     outertoldir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
+    #     mkpath(outertoldir)
+    # end
     outfile_pdf = "$(dir)/$(outfile)_als_rank_$(r).pdf"
     # savefig(p, outfile_pdf)
     outfile_html = "$(dir)/$(outfile)_als_rank_$(r).html"
@@ -170,12 +171,13 @@ function save_relaxation_panel_pdf(
     singular_values::Vector{Float64},
     outer_tol::Float64,
     size_B::Tuple{Int, Int}, cond_B::Float64;
+    cg_method = "IterativeSolver_cg",
     outfile::AbstractString = "als_relaxation",
 )
 
     lay = @layout [grid(7,1)]
     p = plot(layout=lay, size=(5000, 7000), margin=10mm, left_margin=20mm,
-             plot_title="ALS Relaxation Panel |matrix size = $(size_B) cond = $cond_B |  rank = $r| outer_tol=$(@sprintf("%.1e", outer_tol)) ")
+             plot_title="ALS Relaxation Panel |matrix size = $(size_B) cond = $cond_B |  rank = $r| outer_tol=$(@sprintf("%.1e", outer_tol)) | method = $cg_method ")
 
     vec_inner_tol = [res.inner_abstol for res in resvec_inner]
     vec_outer_iters = [res.outer_iters for res in resvec_inner]
@@ -314,7 +316,7 @@ function save_relaxation_panel_pdf(
     condstr = @sprintf("cond%.2f", cond_B)
     rankstr = "rank_$(r)"
     outertolstr = @sprintf("outertol_%1.0e", outer_tol)
-    dir = "data/results_pdf/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
+    dir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
     mkpath(dir)
     # outpath = "$(dir)/$(outfile)_als_rank_$(r).pdf"
 
@@ -328,12 +330,13 @@ end
 
 function save_singular_values_csv(r::Int, singular_values::Vector{Float64}, svd_ratios::Vector{Float64},
                                 size_B::Tuple{Int, Int}, cond_B::Float64
-                                ; outfile="singular_values_table")
+                                ; cg_method = "IterativeSolvers_cg",
+                                outfile="singular_values_table")
     rows, cols = size_B
     matstr  = "$(rows)x$(cols)"
     condstr = @sprintf("cond%.2f", cond_B)
     rankstr = "rank_$(r)"
-    dir = "data/results_pdf/$(matstr)_$(condstr)/$(rankstr)"
+    dir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)"
     mkpath(dir)
 
     path = "$(dir)/$(outfile)_als_rank_$(r).csv"
