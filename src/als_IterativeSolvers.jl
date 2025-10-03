@@ -233,16 +233,16 @@ function als_2d_qr(B::AbstractMatrix, rank::Int,
     total_inner_iters = sum(inner_iters)
 
     X2tX2_fnorm = norm((X2')X2, 2)^2
-    println("X2tX2_norm=", X2tX2_fnorm)
+    # println("X2tX2_norm=", X2tX2_fnorm)
 
     # Compute the angle between the two subspaces spanned by SigmaVt X2 and [I_(rxr), 0_((m-r)xr)]_(mxr)
     last_theta_max = max_angle[end] * pi / 180
-    println("The max principal angle (in degree) between the two subspaces spanned by SigmaVt X2 and [I_(rxr), 0_((m-r)xr)]_(mxr) is ", last_theta_max)
+    # println("The max principal angle (in degree) between the two subspaces spanned by SigmaVt X2 and [I_(rxr), 0_((m-r)xr)]_(mxr) is ", last_theta_max)
     last_upper_error_bound = upper_error_bound[end]
     #last_theor_ratio = bound_ratio[end-1]
     last_theor_ratio = length(bound_ratio) ≥ 2 ? bound_ratio[end-1] : NaN
-    println("The upper error bound cond(B) * sin(theta_max) * B_fnorm is ", last_upper_error_bound)
-    println("The ratio in fonction of sin(theta_max) is ", last_theor_ratio)
+    # println("The upper error bound cond(B) * sin(theta_max) * B_fnorm is ", last_upper_error_bound)
+    # println("The ratio in fonction of sin(theta_max) is ", last_theor_ratio)
     
 
     result = ALSResult(rank, outer_iters, inner_iters, total_inner_iters, als_error, converged_als, time_cg, total_time_cg, outer_tol, inner_abstol, inner_reltol, cg_last_resnorm_1, cg_last_resnorm_2, X2tX2_fnorm, bound_ratio, max_angle, upper_error_bound, last_theta_max, last_upper_error_bound, last_theor_ratio)

@@ -31,8 +31,8 @@ for dir in matrix_dirs
 
             n, m = size(B)
             ranks =[ceil(Int, 0.25*m), ceil(Int, 0.5*m), ceil(Int, 0.75*m), m]
-            exact_results_by_rank = Dict{Int, Vector{ALSResult}}()
-            results_by_inner_tol = Dict{Float64, Vector{ALSResult}}()
+            exact_results_by_rank = Dict{Int, Vector{ALSResult}}() # store data only
+            results_by_inner_tol = Dict{Float64, Vector{ALSResult}}() # store data only
             tol_num = 13
             # tol_num = 1
 

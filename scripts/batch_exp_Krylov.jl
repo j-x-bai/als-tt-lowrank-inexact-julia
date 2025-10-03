@@ -38,7 +38,7 @@ for dir in matrix_dirs
 
             for r in ranks
                 B_svdt, svd_error, svd_ratios, singular_values, SigmaVt, square_sigma_ratio = svd_truncated(B, r)
-                save_singular_values_csv(r, singular_values, svd_ratios, size(B), cond_B)
+                save_singular_values_csv(r, singular_values, svd_ratios, size(B), cond_B; cg_method = "Krylov_cg")
                 resvec = Vector{ALSResult}(undef, tol_num)
                 for k in range(1, tol_num)
                     outer_tol = 10.0^(-13 + k) 

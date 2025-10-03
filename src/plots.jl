@@ -68,7 +68,7 @@ function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult},
         else
             last_ratio[j] = NaN
         end
-        print("length(ratio) = ", length(ratio), "\n")
+        # print("length(ratio) = ", length(ratio), "\n")
         plot!(p[idx(j,2)], x[2:end], ratio; xlabel="Outer iteration",title="Error Ratio vs Theoretical Ratio($(names[j]))", legend=false)
         plot!(p[idx(j,2)], x, y6;label="ratio of upper theoretical bound")
 
@@ -110,7 +110,7 @@ function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult},
         string(resvec[j].outer_iters),
         string(resvec[j].converged_als),
         @sprintf("%.4f", last_ratio[j]),
-        @sprintf("%.3f", resvec[j].X2tX2_fnorm),
+        @sprintf("%.3e", resvec[j].X2tX2_fnorm),
         @sprintf("%.3e", resvec[j].last_upper_error_bound),
         @sprintf("%.3f", resvec[j].last_theta_max),
         @sprintf("%.4e", resvec[j].last_theor_ratio),
@@ -147,20 +147,13 @@ function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult},
     matstr = "$(rows)x$(cols)"
     condstr = @sprintf("cond%.2f", cond_B)
     rankstr = "rank_$(r)"
-    
+
     dir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)"
     mkpath(dir) 
-    # for res in resvec
-    #     outertolstr = @sprintf("outertol_%1.0e", res.outer_tol)
-    #     outertoldir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
-    #     mkpath(outertoldir)
-    # end
-    outfile_pdf = "$(dir)/$(outfile)_als_rank_$(r).pdf"
-    # savefig(p, outfile_pdf)
     outfile_html = "$(dir)/$(outfile)_als_rank_$(r).html"
     savefig(p, outfile_html)
 
-    return outfile_pdf, outfile_html
+    return outfile_html
 end
 
 
@@ -283,7 +276,7 @@ function save_relaxation_panel_pdf(
         string(res.total_inner_iters),
         string(res.outer_iters),
         string(res.converged_als),
-        string("%.3f", res.X2tX2_fnorm),
+        string("%.3e", res.X2tX2_fnorm),
         @sprintf("%.3e", res.last_upper_error_bound),
         @sprintf("%.3f", res.last_theta_max),
         @sprintf("%.4e", res.last_theor_ratio),
@@ -319,12 +312,11 @@ function save_relaxation_panel_pdf(
     dir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
     mkpath(dir)
     # outpath = "$(dir)/$(outfile)_als_rank_$(r).pdf"
-
-    outpath_pdf = "$(dir)/$(outfile)_als_rank_$(r).pdf"
+    # outpath_pdf = "$(dir)/$(outfile)_als_rank_$(r).pdf"
     # savefig(p, outpath_pdf)
     outpath_html = "$(dir)/$(outfile)_als_rank_$(r).html"
     savefig(p, outpath_html)
-    return outpath_pdf, outpath_html
+    return outpath_html
 end
 
 
