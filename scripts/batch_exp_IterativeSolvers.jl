@@ -8,7 +8,7 @@ plotlyjs()
 # data = load("data/matrix/10x10/10x10_cond9.24.jld2")
 # B = data["B"]
 # cond_B = data["cond_B"]
-# ranks = [3, 5, 7, 10]
+# ranks = [3, 5, 8, 10]
 # ranks=[3]
 
 println("Detected CPU threads available on system: ", Sys.CPU_THREADS)
@@ -16,7 +16,8 @@ println("Julia is currently using threads: ", Threads.nthreads())
 
 num_threads = Threads.nthreads()
 
-matrix_dirs = readdir(joinpath(@__DIR__, "../data/test_matrix"), join=true)
+#matrix_dirs = readdir(joinpath(@__DIR__, "../data/test_matrix"), join=true)
+matrix_dirs = readdir(joinpath(@__DIR__, "../data/matrix_by_singular_values"), join=true)
 println("successful read matrix dirs: ", matrix_dirs)
 
 for dir in matrix_dirs

@@ -12,7 +12,8 @@ num_threads = Threads.nthreads()
 
 #----------------------------------------------------------------------------------------------------------------#
 # Load test matrix
-data = load("data/test_matrix/10x10/10x10_cond9.24.jld2")
+#data = load("data/test_matrix/10x10/10x10_cond9.24.jld2")
+data = load("data/matrix_by_sigular_values/10x10/10x10_cond4.00.jld2")
 B = data["B"]
 n, m = size(B)
 cond_B = data["cond_B"]
@@ -20,7 +21,7 @@ cond_B = data["cond_B"]
 
 #----------------------------------------------------------------------------------------------------------------#
 # Tests for a fixed rank r and fixed outer tolrance
-r = 3 # low-rank
+r = 7 # low-rank
 k = 0 # fixed tolerance index: outer_tol = 10.0^(-13 + k)
 tol_num = 13 # number of inner tolerances to test: inner_tol = 10.0^(-13 + k+j-1), j=1,...,tol_num+1-k 
 
