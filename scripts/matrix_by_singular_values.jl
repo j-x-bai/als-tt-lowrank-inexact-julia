@@ -27,17 +27,6 @@ function matrix_with_singular_values(s::AbstractVector{<:Real},
     
 end
 
-rng = MersenneTwister(2025)
-m, n = 20, 20                           # m rows, n columns
-sv_base = 0.6
-generated_singular_values = [sv_base^i for i in 1:20]           # desired singular values, length must be min(m,n), all positive     
-A = matrix_with_singular_values(generated_singular_values, m, n; rng=rng)
-cond_A = cond(A)
-size_n, size_m = size(A)
-
-# S = svd(A).S
-# @show S
-
 
 function save_matrix_by_sv_with_info(B, cond_B, singular_values_B, sv_base_B)
     m, n = size(B)
@@ -60,4 +49,13 @@ function save_matrix_by_sv_with_info(B, cond_B, singular_values_B, sv_base_B)
         @error "Error saving file" exception=e
     end
 end
-save_matrix_by_sv_with_info(A, cond_A, generated_singular_values, sv_base)
+
+rng = MersenneTwister(2025)
+m, n = 100, 100                           # m rows, n columns
+sv_bases = round.([i * 0.1 for i in 1:9]; digits=1)
+for sv_base in sv_bases
+    generated_singular_values = [sv_base^i for i in 1:100]           # desired singular values, length must be min(m,n), all positive     
+    A = matrix_with_singular_values(generated_singular_values, m, n; rng=rng)
+    cond_A = cond(A)
+    save_matrix_by_sv_with_info(A, cond_A, generated_singular_values, sv_base)
+end 
