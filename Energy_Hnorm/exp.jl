@@ -6,21 +6,21 @@ plotlyjs()
 
 # generate SPD H = I⊗A + A⊗I where A = SPD_Matrix is SPD
 rng_A = MersenneTwister(2025)
-rank = 50
+rank = 40
 
 
-n= 50
+n= 80
 modified_energy = false
-# # randn A 
-# A = randn(rng_A, n, n) 
-# # A_spd = A' * A
-# A_spd = Symmetric(A' * A)
-# SPD_Matrix = Symmetric(A_spd)
-# name_A = "A=randn"
+# randn A 
+A = randn(rng_A, n, n) 
+# A_spd = A' * A
+A_spd = Symmetric(A' * A)
+SPD_Matrix = Symmetric(A_spd)
+name_A = "A=randn"
 
-# A = Id
-A_spd = Matrix{Float64}(I, n, n)
-name_A = "A=Id"
+# # A = Id
+# A_spd = Matrix{Float64}(I, n, n)
+# name_A = "A=Id"
 
 # # A = 0.5*Id
 # A_spd = 0.5.*Matrix{Float64}(I, n, n)
@@ -34,7 +34,7 @@ name_A = "A=Id"
 
 #-------------------------------------------------------------------------------------------------------------#
 # H
-m = 50
+m = 80
 I_m = Matrix{Float64}(I, m, m)
 Kron_Product_1 = kron(I_m, A_spd) # Kronecker product: (m*n) x (m*n)
 Kron_Product_2 =  kron(A_spd, I_m) # Kronecker product: (m*n) x (m*n)
@@ -111,6 +111,15 @@ println("The error between energy and X_Hnorm_sol = ", error_energy_and_X_Hnorm_
 println("The error between energy and B_Hnrom_truncated_sol = ", error_energy_and_B_Hnrom_truncated_sol)
 #-------------------------------------------------------------------------------------------------------------#
 
+#-------------------------------------------------------------------------------------------------------------#
+vec_X_energy_sol = reshape(X_energy_sol, m*n, 1)
+vec_hat_X_energy_sol = H_half * vec_X_energy_sol
+hat_X_energy_sol = reshape(vec_hat_X_energy_sol, m, n) 
+
+error_hat_X_energy_sol_and_hat_X_sol = norm(hat_X_energy_sol - hat_X_sol, 2)
+error_hat_X_energy_sol_and_hat_B_svd_truncated = norm(hat_X_energy_sol - hat_B_svd_truncated, 2)
+#-------------------------------------------------------------------------------------------------------------#
+
 
 #-------------------------------------------------------------------------------------------------------------#
 vec_B = reshape(B, m*n, 1)
@@ -141,3 +150,6 @@ html =  plot_energy_and_Hnorm_solution(
     outfile = "energy_vs_hnorm"
 )
 println("saved: ", html)
+
+
+

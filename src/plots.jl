@@ -4,6 +4,7 @@ using Printf
 using Measures
 using Base.Threads
 plotlyjs()
+#gr()
 
 
 function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult}, 
@@ -131,6 +132,7 @@ function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult},
     mkpath(dir) 
     outfile_html = "$(dir)/$(outfile)_als_rank_$(r).html"
     savefig(p, outfile_html)
+    # savehtml(p, "als_fast_test.html"; include_plotlyjs="cdn")
 
     return outfile_html
 end
@@ -337,10 +339,10 @@ function compare_2d_Id_als_normal_and_NM_exact(r::Int, resvec_Normal::Vector{ALS
                              outfile = "exact_ALS_Normal_and_ALS_Newton")
 
     K = length(resvec_Normal)
-    Kcol = 8
+    Kcol = 9
 
     lay = @layout [grid(K, Kcol); T{0.1h}]
-    p = plot(layout=lay, size=(8000, K*700+1000), margin=20mm, left_margin=30mm, 
+    p = plot(layout=lay, size=(10000, K*700+1000), margin=20mm, left_margin=30mm, 
              plot_title="Exact ALS Rank Panel: ALS Normal and ALS Newton | matrix size = $(size_B) cond = $cond_B |  rank = $r |  method = $cg_method ")
 
     idx(row, col) = (row-1)*Kcol + col
@@ -366,7 +368,9 @@ function compare_2d_Id_als_normal_and_NM_exact(r::Int, resvec_Normal::Vector{ALS
         y7_Normal = res_Normal.max_angle  * pi / 180
         # y8_Normal = res_Normal.upper_error_bound
         x9_Normal = range(1, 2*res_Normal.outer_iters)
+        #println("length x9 = ", length(x9_Normal))
         y9_Normal = res_Normal.norm_grad
+        #println("length y9 = ", length(y9_Normal))
 
         res_NM = resvec_NM[j]
         x_NM  = range(1, res_NM.outer_iters)
@@ -388,23 +392,27 @@ function compare_2d_Id_als_normal_and_NM_exact(r::Int, resvec_Normal::Vector{ALS
         plot!(p[idx(j,1)], x_NM, y1_NM;label="ALS Newton")
 
         # Compute error ratio 
-        ratio_Normal = [y1_Normal[k]/y1_Normal[k-1] for k in range(2,length(y1_Normal))]
+        ratio_range_Normal = range(2,length(y1_Normal))
+        ratio_Normal = [y1_Normal[k]/y1_Normal[k-1] for k in ratio_range_Normal]
         if !isempty(ratio_Normal)
             last_ratio_Normal[j] = ratio_Normal[end]
         else
             last_ratio_Normal[j] = NaN
         end
         # print("length(ratio) = ", length(ratio), "\n")
-        plot!(p[idx(j,2)], x_Normal[2:end], ratio_Normal; label="ALS Normal", xlabel="Outer iteration",title="Error Ratio ($(names[j]))", legend=false)
+        xratio_Normal = x_Normal[2:end]
+        plot!(p[idx(j,2)], xratio_Normal, ratio_Normal; label="ALS Normal", xlabel="Outer iteration",title="Error Ratio ($(names[j]))", legend=false)
         # plot!(p[idx(j,2)], x_Normal, y6_Normal;label="ratio of upper theoretical bound")
 
-        ratio_NM = [y1_NM[k]/y1_NM[k-1] for k in range(2,length(y1_NM))]
+        ratio_range_NM = range(2,length(y1_NM))
+        ratio_NM = [y1_NM[k]/y1_NM[k-1] for k in ratio_range_NM]
         if !isempty(ratio_NM)
             last_ratio_NM[j] = ratio_NM[end]
         else
             last_ratio_NM[j] = NaN
         end
-        plot!(p[idx(j,2)], x_NM[2:end], ratio_NM;label="ALS Newton")
+        xratio_NM = x_NM[2:end]
+        plot!(p[idx(j,2)], xratio_NM, ratio_NM;label="ALS Newton")
 
         plot!(p[idx(j,3)], x_Normal, y2_Normal; label="ALS Normal",legend=false,
         xlabel="Outer iteration", title="Inner iters ($(names[j]))")
@@ -420,7 +428,7 @@ function compare_2d_Id_als_normal_and_NM_exact(r::Int, resvec_Normal::Vector{ALS
 
         plot!(p[idx(j,6)], x_Normal, y5_Normal;label="right ALS Normal",
               xlabel="Outer iteration", title="right CG residual matrix in frobenius norm ($(names[j]))")
-        plot!(p[idx(j,6)], x_Normal, y5_NM;label="right ALS Newton")
+        plot!(p[idx(j,6)], x_NM, y5_NM;label="right ALS Newton")
 
         plot!(p[idx(j,7)], x_Normal, y7_Normal; legend=false, label="ALS Normal",
               xlabel="Outer iteration", title="Max principal angle between subspaces in degree ($(names[j]))")
@@ -428,8 +436,18 @@ function compare_2d_Id_als_normal_and_NM_exact(r::Int, resvec_Normal::Vector{ALS
 
 
         plot!(p[idx(j,8)], x9_Normal, y9_Normal; legend=false, label="ALS Normal",
-              xlabel="Outer iteration", title="Norm of gradient ($(names[j]))")
+              xlabel="Outer iteration", title="Norm of gradient ($(names[j])) per full and half step")
         plot!(p[idx(j,8)], x9_NM, y9_NM; legend=false, label="ALS NM")
+
+        x10_Normal = range(1, res_Normal.outer_iters)
+        y10_Normal = [y9_Normal[2*s] for s in x10_Normal]
+        x10_NM = range(1, res_NM.outer_iters)
+        y10_NM = [y9_NM[2*s] for s in x10_NM]
+    
+        # Full step
+        plot!(p[idx(j,9)], x10_Normal, y10_Normal; legend=false,label="Normal",yscale=:log10,
+          xlabel="Outer iteration", title="ALS Normal and ALS Newton: Norm of gradient ($(names[j])) per full step")
+        plot!(p[idx(j,9)], x10_NM, y10_NM; legend=false,label="Newton")
 
 
         error_mat_sol_Normal_Newton .= res_Normal.X1_sol * (res_Normal.X2_sol') - res_NM.X1_sol * (res_NM.X2_sol')
@@ -536,7 +554,7 @@ function compare_2d_Id_als_NM_exact_and_NM_inexact(r::Int, resvec_NMExact::Vecto
                              outfile = "ALS_Newton_Exact_and_ALS_Newton_Inexact")
 
     K = length(resvec_NMExact)
-    Kcol = 8
+    Kcol = 9
 
     lay = @layout [grid(K, Kcol); T{0.1h}]
     p = plot(layout=lay, size=(10000, K*700+1000), margin=20mm, left_margin=30mm, 
@@ -622,8 +640,18 @@ function compare_2d_Id_als_NM_exact_and_NM_inexact(r::Int, resvec_NMExact::Vecto
 
         
         plot!(p[idx(j,8)], x9_NMExact, y9_NMExact; legend=false, label="ALS NMExact",
-              xlabel="Outer iteration", title="Norm of gradient ($(names[j]))")
+              xlabel="Outer iteration", title="Norm of gradient ($(names[j])) per half and full step")
         plot!(p[idx(j,8)], x9_NMInexact, y9_NMInexact; legend=false, label="ALS NMInexact")
+
+        x10_NMExact = range(1, res_NMExact.outer_iters)
+        y10_NMExact= [y9_NMExact[2*s] for s in x10_NMExact]
+        x10_NMInexact = range(1, res_NMInexact.outer_iters)
+        y10_NMInexact = [y9_NMInexact[2*s] for s in x10_NMInexact]
+    
+        # Full step
+        plot!(p[idx(j,9)], x10_NMExact, y10_NMExact; legend=false,label="Exact",yscale=:log10,
+          xlabel="Outer iteration", title="ALS Newton exact and ALS Newton inexact: Norm of gradient ($(names[j])) per full step")
+        plot!(p[idx(j,9)], x10_NMInexact, y10_NMInexact; legend=false,label="Inexact")
 
         error_mat_sol_NMExact_NMInexact .= res_NMExact.X1_sol * (res_NMExact.X2_sol') - res_NMInexact.X1_sol * (res_NMInexact.X2_sol')
         error_norm_sol_NMExact_NMInexact[j] = norm(error_mat_sol_NMExact_NMInexact, 2)

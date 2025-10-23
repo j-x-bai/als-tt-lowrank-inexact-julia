@@ -497,6 +497,8 @@ function als_2d_Id_newton(B::AbstractMatrix, rank::Int,
             converged_als = true
             break
         end
+        fill!(dX_mr, 0)
+        fill!(dX_nr, 0)
     end
 
     # B_als = X1 * X2'

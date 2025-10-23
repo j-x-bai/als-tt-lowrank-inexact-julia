@@ -16,8 +16,8 @@ println("Julia is currently using threads: ", Threads.nthreads())
 
 num_threads = Threads.nthreads()
 
-matrix_dirs = readdir(joinpath(@__DIR__, "../data/matrix"), join=true)
-# matrix_dirs = readdir(joinpath(@__DIR__, "../data/test_matrix"), join=true)
+# matrix_dirs = readdir(joinpath(@__DIR__, "../data/matrix"), join=true)
+matrix_dirs = readdir(joinpath(@__DIR__, "../data/test_matrix"), join=true)
 # matrix_dirs = readdir(joinpath(@__DIR__, "../data/matrix_by_singular_values"), join=true)
 println("successful read matrix dirs: ", matrix_dirs)
 
@@ -33,11 +33,11 @@ for dir in matrix_dirs
 
             n, m = size(B)
             #ranks =[ceil(Int, 0.25*m), ceil(Int, 0.5*m), ceil(Int, 0.75*m), m]
-            ranks = [10]
+            ranks = [3]
             # ranks =[ceil(Int, 0.25*m), ceil(Int, 0.5*m), ceil(Int, 0.75*m)]
             # exact_results_by_rank = Dict{Int, Vector{ALSResult}}() # store data only
             # results_by_inner_tol = Dict{Float64, Vector{ALSResult}}() # store data only
-            tol_num = 5
+            tol_num = 1
             # tol_num = 1
             min_tol_outer = -13
             min_tol_inner = -13

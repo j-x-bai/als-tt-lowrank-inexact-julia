@@ -1,5 +1,6 @@
 using IterativeSolvers
 using LinearAlgebra
+# using BenchmarkTools
 using Base.Threads
 using JLD2
 using Plots
@@ -8,32 +9,31 @@ using Plots
 # X2: m x r
 # B: n x m
 # B = X1 * X2'
- 
-# struct ALSResult is changed.
-struct ALSResult 
-    X1_sol::Matrix{Float64}
-    X2_sol::Matrix{Float64}
-    rank::Int
-    outer_iters::Int
-    inner_iters::Vector{Int}
-    total_inner_iters::Int
-    als_error::Vector{Float64}
-    converged_als::Bool
-    time_cg::Vector{Float64}
-    total_time_cg::Float64
-    outer_tol::Float64
-    inner_abstol::Float64
-    inner_reltol::Float64
-    cg_last_resnorm_1::Vector{Float64}
-    cg_last_resnorm_2::Vector{Float64}
-    X2tX2_fnorm::Float64
-    bound_ratio::Vector{Float64}
-    max_angle::Vector{Float64} # radians
-    upper_error_bound::Vector{Float64}
-    last_theta_max::Float64
-    last_upper_error_bound::Float64
-    last_theor_ratio::Float64
-end
+
+# struct ALSResult 
+#     X1_sol::Matrix{Float64}
+#     X2_sol::Matrix{Float64}
+#     rank::Int
+#     outer_iters::Int
+#     inner_iters::Vector{Int}
+#     total_inner_iters::Int
+#     als_error::Vector{Float64}
+#     converged_als::Bool
+#     time_cg::Vector{Float64}
+#     total_time_cg::Float64
+#     outer_tol::Float64
+#     inner_abstol::Float64
+#     inner_reltol::Float64
+#     cg_last_resnorm_1::Vector{Float64}
+#     cg_last_resnorm_2::Vector{Float64}
+#     X2tX2_fnorm::Float64
+#     bound_ratio::Vector{Float64}
+#     max_angle::Vector{Float64} # radians
+#     upper_error_bound::Vector{Float64}
+#     last_theta_max::Float64
+#     last_upper_error_bound::Float64
+#     last_theor_ratio::Float64
+# end
 
 function als_2d_qr(B::AbstractMatrix, rank::Int, 
                 cond_B::Float64,
