@@ -2,36 +2,15 @@ using JLD2
 using Plots
 using Printf
 using Measures
+using Base.Threads
 plotlyjs()
 
-
-# struct ALSResult 
-#     rank::Int
-#     outer_iters::Int
-#     inner_iters::Vector{Int}
-#     total_inner_iters::Int
-#     als_error::Vector{Float64}
-#     converged_als::Bool
-#     time_cg::Vector{Float64}
-#     total_time_cg::Float64
-#     outer_tol::Float64
-#     inner_abstol::Float64
-#     inner_reltol::Float64
-#     cg_last_resnorm_1::Vector{Float64}
-#     cg_last_resnorm_2::Vector{Float64}
-#     X2tX2_fnorm::Float64
-#     bound_ratio::Vector{Float64}
-#     max_angle::Vector{Float64} # radians
-#     upper_error_bound::Vector{Float64}
-#     last_theta_max::Float64
-#     last_upper_error_bound::Float64
-#     last_theor_ratio::Float64
-# end
 
 function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult}, 
                              svd_ratios::Vector{Float64},singular_values::Vector{Float64},
                              size_B::Tuple{Int, Int}, cond_B::Float64;
                              cg_method = "IterativeSolvers_cg",
+                             als_method = "ALS_Normal",
                              names = ["outer=$(resvec[i].outer_tol), inner=$(resvec[i].inner_abstol)" for i in range(1, length(resvec))],
                              outfile = "exact")
 
@@ -148,7 +127,7 @@ function save_rank_panel_pdf(r::Int, resvec::Vector{ALSResult},
     condstr = @sprintf("cond%.2f", cond_B)
     rankstr = "rank_$(r)"
 
-    dir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)"
+    dir = "data/results_html/$(cg_method)/$(als_method)/$(matstr)_$(condstr)/$(rankstr)"
     mkpath(dir) 
     outfile_html = "$(dir)/$(outfile)_als_rank_$(r).html"
     savefig(p, outfile_html)
@@ -158,15 +137,16 @@ end
 
 
 function save_relaxation_panel_pdf(
-    r::Int,
-    resvec_inner::Vector{ALSResult},
-    svd_ratios::Vector{Float64},
-    singular_values::Vector{Float64},
-    outer_tol::Float64,
-    size_B::Tuple{Int, Int}, cond_B::Float64;
-    cg_method = "IterativeSolver_cg",
-    outfile::AbstractString = "als_relaxation",
-)
+                                    r::Int,
+                                    resvec_inner::Vector{ALSResult},
+                                    svd_ratios::Vector{Float64},
+                                    singular_values::Vector{Float64},
+                                    outer_tol::Float64,
+                                    size_B::Tuple{Int, Int}, cond_B::Float64;
+                                    cg_method = "IterativeSolver_cg",
+                                    als_method = "ALS Normal",
+                                    outfile::AbstractString = "als_relaxation",
+                                )
 
     lay = @layout [grid(7,1)]
     p = plot(layout=lay, size=(5000, 7000), margin=10mm, left_margin=20mm,
@@ -309,7 +289,7 @@ function save_relaxation_panel_pdf(
     condstr = @sprintf("cond%.2f", cond_B)
     rankstr = "rank_$(r)"
     outertolstr = @sprintf("outertol_%1.0e", outer_tol)
-    dir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
+    dir = "data/results_html/$(cg_method)/$(als_method)/$(matstr)_$(condstr)/$(rankstr)/$(outertolstr)"
     mkpath(dir)
     # outpath = "$(dir)/$(outfile)_als_rank_$(r).pdf"
     # outpath_pdf = "$(dir)/$(outfile)_als_rank_$(r).pdf"
@@ -328,7 +308,7 @@ function save_singular_values_csv(r::Int, singular_values::Vector{Float64}, svd_
     matstr  = "$(rows)x$(cols)"
     condstr = @sprintf("cond%.2f", cond_B)
     rankstr = "rank_$(r)"
-    dir = "data/results_html/$(cg_method)/$(matstr)_$(condstr)/$(rankstr)"
+    dir = "data/results_html/$(cg_method)/singular_values/$(matstr)_$(condstr)/$(rankstr)"
     mkpath(dir)
 
     path = "$(dir)/$(outfile)_als_rank_$(r).csv"
@@ -344,4 +324,397 @@ function save_singular_values_csv(r::Int, singular_values::Vector{Float64}, svd_
         end
     end
     return path
+end
+
+
+
+function compare_2d_Id_als_normal_and_NM_exact(r::Int, resvec_Normal::Vector{ALSResult}, 
+                             resvec_NM::Vector{ALSResult}, 
+                             svd_ratios::Vector{Float64},singular_values::Vector{Float64},
+                             size_B::Tuple{Int, Int}, cond_B::Float64;
+                             cg_method = "IterativeSolvers_cg",
+                             names = ["outer=$(resvec_Normal[i].outer_tol), inner=$(resvec_Normal[i].inner_abstol)" for i in range(1, length(resvec_Normal))],
+                             outfile = "exact_ALS_Normal_and_ALS_Newton")
+
+    K = length(resvec_Normal)
+    Kcol = 8
+
+    lay = @layout [grid(K, Kcol); T{0.1h}]
+    p = plot(layout=lay, size=(8000, K*700+1000), margin=20mm, left_margin=30mm, 
+             plot_title="Exact ALS Rank Panel: ALS Normal and ALS Newton | matrix size = $(size_B) cond = $cond_B |  rank = $r |  method = $cg_method ")
+
+    idx(row, col) = (row-1)*Kcol + col
+    last_ratio_Normal = zeros(K)
+    last_ratio_NM = zeros(K)
+    error_norm_sol_Normal_Newton = zeros(K)
+    error_norm_X1_sol_Normal_Newton = zeros(K)
+    error_norm_X2_sol_Normal_Newton = zeros(K)
+    error_mat_sol_Normal_Newton = zeros(size_B)
+    error_mat_X1_sol_Normal_Newton = zeros(size_B[1], r)
+    error_mat_X2_sol_Normal_Newton = zeros(size_B[2], r)
+
+    for j in 1:K
+        res_Normal = resvec_Normal[j]
+        x_Normal  = range(1, res_Normal.outer_iters)
+        y1_Normal = res_Normal.als_error
+        y2_Normal = res_Normal.inner_iters
+        y3_Normal = res_Normal.time_cg
+        y4_Normal = res_Normal.cg_last_resnorm_1
+        y5_Normal = res_Normal.cg_last_resnorm_2
+        
+        # y6_Normal = res_Normal.bound_ratio
+        y7_Normal = res_Normal.max_angle  * pi / 180
+        # y8_Normal = res_Normal.upper_error_bound
+        x9_Normal = range(1, 2*res_Normal.outer_iters)
+        y9_Normal = res_Normal.norm_grad
+
+        res_NM = resvec_NM[j]
+        x_NM  = range(1, res_NM.outer_iters)
+        y1_NM = res_NM.als_error
+        y2_NM = res_NM.inner_iters
+        y3_NM = res_NM.time_cg
+        y4_NM = res_NM.cg_last_resnorm_1
+        y5_NM = res_NM.cg_last_resnorm_2
+        
+        # y6_NM = res_NM.bound_ratio
+        y7_NM = res_NM.max_angle  * pi / 180
+        # y8_NM = res_NM.upper_error_bound
+        x9_NM = range(1, 2*res_NM.outer_iters)
+        y9_NM = res_NM.norm_grad
+
+        plot!(p[idx(j,1)], x_Normal, y1_Normal; label="ALS Normal", yscale=:log10, legend=false,
+              xlabel="Outer iteration", title="ALS error: || X - B_r ||_F at each outer iteration($(names[j]))")
+        # plot!(p[idx(j,1)], x_Normal, y8_Normal;label="Upper error bound in opnorm-2")
+        plot!(p[idx(j,1)], x_NM, y1_NM;label="ALS Newton")
+
+        # Compute error ratio 
+        ratio_Normal = [y1_Normal[k]/y1_Normal[k-1] for k in range(2,length(y1_Normal))]
+        if !isempty(ratio_Normal)
+            last_ratio_Normal[j] = ratio_Normal[end]
+        else
+            last_ratio_Normal[j] = NaN
+        end
+        # print("length(ratio) = ", length(ratio), "\n")
+        plot!(p[idx(j,2)], x_Normal[2:end], ratio_Normal; label="ALS Normal", xlabel="Outer iteration",title="Error Ratio ($(names[j]))", legend=false)
+        # plot!(p[idx(j,2)], x_Normal, y6_Normal;label="ratio of upper theoretical bound")
+
+        ratio_NM = [y1_NM[k]/y1_NM[k-1] for k in range(2,length(y1_NM))]
+        if !isempty(ratio_NM)
+            last_ratio_NM[j] = ratio_NM[end]
+        else
+            last_ratio_NM[j] = NaN
+        end
+        plot!(p[idx(j,2)], x_NM[2:end], ratio_NM;label="ALS Newton")
+
+        plot!(p[idx(j,3)], x_Normal, y2_Normal; label="ALS Normal",legend=false,
+        xlabel="Outer iteration", title="Inner iters ($(names[j]))")
+        plot!(p[idx(j,3)], x_NM, y2_NM; label="ALS Newton")
+
+        plot!(p[idx(j,4)], x_Normal, y3_Normal; label="ALS Normal",legend=false,
+                xlabel="Outer iteration", title="Time ($(names[j]))")
+        plot!(p[idx(j,4)], x_NM, y3_NM; label="ALS Newton")
+
+        plot!(p[idx(j,5)], x_Normal, y4_Normal;label="left ALS Normal",
+              xlabel="Outer iteration", title="left CG residual matrix in frobenius norm ($(names[j]))")
+        plot!(p[idx(j,5)], x_NM, y4_NM;label="left ALS Newton")
+
+        plot!(p[idx(j,6)], x_Normal, y5_Normal;label="right ALS Normal",
+              xlabel="Outer iteration", title="right CG residual matrix in frobenius norm ($(names[j]))")
+        plot!(p[idx(j,6)], x_Normal, y5_NM;label="right ALS Newton")
+
+        plot!(p[idx(j,7)], x_Normal, y7_Normal; legend=false, label="ALS Normal",
+              xlabel="Outer iteration", title="Max principal angle between subspaces in degree ($(names[j]))")
+        plot!(p[idx(j,7)], x_NM, y7_NM; legend=false, label="ALS Newton")
+
+
+        plot!(p[idx(j,8)], x9_Normal, y9_Normal; legend=false, label="ALS Normal",
+              xlabel="Outer iteration", title="Norm of gradient ($(names[j]))")
+        plot!(p[idx(j,8)], x9_NM, y9_NM; legend=false, label="ALS NM")
+
+
+        error_mat_sol_Normal_Newton .= res_Normal.X1_sol * (res_Normal.X2_sol') - res_NM.X1_sol * (res_NM.X2_sol')
+        error_norm_sol_Normal_Newton[j] = norm(error_mat_sol_Normal_Newton, 2)
+
+        error_mat_X1_sol_Normal_Newton .= res_Normal.X1_sol - res_NM.X1_sol
+        error_norm_X1_sol_Normal_Newton[j] = norm(error_mat_X1_sol_Normal_Newton, 2)
+
+        error_mat_X2_sol_Normal_Newton .= res_Normal.X2_sol - res_NM.X2_sol
+        error_norm_X2_sol_Normal_Newton[j] = norm(error_mat_X2_sol_Normal_Newton, 2)
+        
+    end
+
+    if 1 ≤ r < length(singular_values)
+            Sigma_r_square_ratio = (singular_values[r+1] / singular_values[r])^2
+            Sigma_r_ratio = singular_values[r+1] / singular_values[r]
+            singular_values_r = singular_values[r]
+            singular_values_r1 = singular_values[r+1]
+    else
+            Sigma_r_square_ratio = NaN
+            Sigma_r_ratio = NaN
+            singular_values_r = singular_values[r]
+            singular_values_r1 = NaN
+    end
+
+    num_threads = Threads.nthreads()
+    headers = ["Num of threads","X size","rank","outer_tol", "inner_abstol", "inner_reltol","final_error: Normal | Newton", 
+                "total_time: Normal | Newton", "total_inner_iters: Normal | Newton", "outer_iters: Normal | Newton", "converged: Normal | Newton", "final_ratio: Normal | Newton", 
+                #"X2tX2_fnorm", 
+                #"last_theoretical_error_bound", "last_theta_max", "last_theoretical_ratio", 
+                "sigma_r", "sigma_{r+1}", "sigma_{r+1}/sigma_r", "(sigma_{r+1}/sigma_r)^2",
+                "|| X_Normal - X_Newton ||_F",
+                "|| X1_Normal - X1_Newton ||_F",
+                "|| X2_Normal - X2_Newton ||_F"]
+    rows = [(
+        string(num_threads),
+        string(size_B),
+        string(resvec_Normal[j].rank),
+        @sprintf("Normal = %.1e | Newton = %.1e", resvec_Normal[j].outer_tol, resvec_NM[j].outer_tol),
+        @sprintf("Normal = %.1e | Newton = %.1e", resvec_Normal[j].inner_abstol, resvec_NM[j].inner_abstol),
+        @sprintf("Normal = %.1e | Newton = %.1e", resvec_Normal[j].inner_reltol, resvec_NM[j].inner_reltol),
+        @sprintf("Normal = %.3e | Newton = %.3e", last(resvec_Normal[j].als_error), last(resvec_NM[j].als_error)),
+        @sprintf("Normal = %.3e | Newton = %.3e", resvec_Normal[j].total_time_cg, resvec_NM[j].total_time_cg),
+        string("Normal = ", resvec_Normal[j].total_inner_iters, "| Newton = ", resvec_NM[j].total_inner_iters),
+        string("Normal = ", resvec_Normal[j].outer_iters, "| Newton = ", resvec_NM[j].outer_iters),
+        string("Normal = ", resvec_Normal[j].converged_als, "| Newton = ", resvec_NM[j].converged_als),
+        @sprintf("Normal = %.4f | Newton = %.4f", last_ratio_Normal[j], last_ratio_NM[j]),
+        #@sprintf("%.3e", resvec_Normal[j].X2tX2_fnorm),
+        # @sprintf("%.3e", resvec_Normal[j].last_upper_error_bound),
+        # @sprintf("%.3f", resvec_Normal[j].last_theta_max),
+        # @sprintf("%.4e", resvec_Normal[j].last_theor_ratio),
+        @sprintf("%.4e", singular_values_r),
+        @sprintf("%.4e", singular_values_r1),
+        @sprintf("%.4e", Sigma_r_ratio),
+        @sprintf("%.4e", Sigma_r_square_ratio),
+        @sprintf("%.4e", error_norm_sol_Normal_Newton[j]),
+        @sprintf("%.4e", error_norm_X1_sol_Normal_Newton[j]),
+        @sprintf("%.4e", error_norm_X2_sol_Normal_Newton[j])
+    ) for j in 1:K]
+
+    tplot = Kcol*K + 1
+    plot!(p[tplot], framestyle=:none, legend=false, xlim=(0,1), ylim=(0,1))
+    ncols = length(headers)
+    xgrid = range(0.02, 0.98; length=ncols)
+    if isempty(rows)
+        for (c, h) in enumerate(headers)
+            annotate!(p[tplot], xgrid[c], 0.95, text(h, 16, :black, :center)) 
+        end
+        annotate!(p[tplot], 0.5, 0.5, text("No data available", 16, :center, :red))
+    else
+        nrows = length(rows) + 1
+        ygrid = range(0.90, 0.10; length=nrows)
+        for (c, h) in enumerate(headers)
+            annotate!(p[tplot], xgrid[c], ygrid[1], text(h, 16, :black, :center))
+        end
+        for rrow in range(1, length(rows))
+            vals = rows[rrow]
+            for c in 1:ncols
+                annotate!(p[tplot], xgrid[c], ygrid[rrow+1], text(vals[c], 16, :black, :center))
+            end
+        end
+        annotate!(p[tplot], 0.02, 0.98, text("Matrix size $(size_B) Condition number $(cond_B) Rank = $r  (summary of $K configs)", 11, :black, :left))
+    end
+    rows, cols = size_B
+    matstr = "$(rows)x$(cols)"
+    condstr = @sprintf("cond%.2f", cond_B)
+    rankstr = "rank_$(r)"
+
+    dir = "data/results_html/$(cg_method)/ALS_Normal_vs_ALS_Newton/$(matstr)_$(condstr)/$(rankstr)"
+    mkpath(dir) 
+    outfile_html = "$(dir)/$(outfile)_als_rank_$(r).html"
+    savefig(p, outfile_html)
+
+    return outfile_html
+end
+
+
+function compare_2d_Id_als_NM_exact_and_NM_inexact(r::Int, resvec_NMExact::Vector{ALSResult}, 
+                             resvec_NMInexact::Vector{ALSResult}, 
+                             svd_ratios::Vector{Float64},singular_values::Vector{Float64},
+                             size_B::Tuple{Int, Int}, cond_B::Float64;
+                             cg_method = "IterativeSolvers_cg",
+                             names = ["outer=$(resvec_NMExact[i].outer_tol), inner=$(resvec_NMExact[i].inner_abstol)" for i in range(1, length(resvec_NMExact))],
+                             outfile = "ALS_Newton_Exact_and_ALS_Newton_Inexact")
+
+    K = length(resvec_NMExact)
+    Kcol = 8
+
+    lay = @layout [grid(K, Kcol); T{0.1h}]
+    p = plot(layout=lay, size=(10000, K*700+1000), margin=20mm, left_margin=30mm, 
+             plot_title="ALS Newton Rank Panel: ALS Newton Exact and ALS Newton Inexact| matrix size = $(size_B) cond = $cond_B |  rank = $r |  method = $cg_method ")
+
+    idx(row, col) = (row-1)*Kcol + col
+    last_ratio_NMExact = zeros(K)
+    last_ratio_NMInexact = zeros(K)
+    error_norm_sol_NMExact_NMInexact = zeros(K)
+    error_norm_X1_sol_NMExact_NMInexact = zeros(K)
+    error_norm_X2_sol_NMExact_NMInexact = zeros(K)
+    error_mat_sol_NMExact_NMInexact = zeros(size_B)
+    error_mat_X1_sol_NMExact_NMInexact = zeros(size_B[1], r)
+    error_mat_X2_sol_NMExact_NMInexact = zeros(size_B[2], r)
+
+    for j in 1:K
+        res_NMExact = resvec_NMExact[j]
+        x_NMExact  = range(1, res_NMExact.outer_iters)
+        y1_NMExact = res_NMExact.als_error
+        y2_NMExact = res_NMExact.inner_iters
+        y3_NMExact = res_NMExact.time_cg
+        y4_NMExact = res_NMExact.cg_last_resnorm_1
+        y5_NMExact = res_NMExact.cg_last_resnorm_2
+        
+        # y6_Normal = res_Normal.bound_ratio
+        y7_NMExact = res_NMExact.max_angle  * pi / 180
+        # y8_Normal = res_Normal.upper_error_bound
+
+        x9_NMExact = range(1, 2*res_NMExact.outer_iters)
+        y9_NMExact = res_NMExact.norm_grad
+
+        res_NMInexact = resvec_NMInexact[j]
+        x_NMInexact  = range(1, res_NMInexact.outer_iters)
+        y1_NMInexact = res_NMInexact.als_error
+        y2_NMInexact = res_NMInexact.inner_iters
+        y3_NMInexact = res_NMInexact.time_cg
+        y4_NMInexact = res_NMInexact.cg_last_resnorm_1
+        y5_NMInexact = res_NMInexact.cg_last_resnorm_2
+        
+        # y6_NM = res_NM.bound_ratio
+        y7_NMInexact = res_NMInexact.max_angle  * pi / 180
+        # y8_NM = res_NM.upper_error_bound
+
+        x9_NMInexact = range(1, 2*res_NMInexact.outer_iters)
+        y9_NMInexact = res_NMInexact.norm_grad
+
+        plot!(p[idx(j,1)], x_NMExact, y1_NMExact; label="ALS NMExact", yscale=:log10, legend=false,
+              xlabel="Outer iteration", title="ALS error: || X - B_r ||_F at each outer iteration($(names[j]))")
+        # plot!(p[idx(j,1)], x_Normal, y8_Normal;label="Upper error bound in opnorm-2")
+        plot!(p[idx(j,1)], x_NMInexact, y1_NMInexact;label="ALS NMInexact")
+
+        # Compute error ratio 
+        ratio_NMExact = [y1_NMExact[k]/y1_NMExact[k-1] for k in range(2,length(y1_NMExact))]
+        if !isempty(ratio_NMExact)
+            last_ratio_NMExact[j] = ratio_NMExact[end]
+        else
+            last_ratio_NMExact[j] = NaN
+        end
+        # print("length(ratio) = ", length(ratio), "\n")
+        plot!(p[idx(j,2)], x_NMExact[2:end], ratio_NMExact; label="ALS NMExact", xlabel="Outer iteration",title="Error Ratio ($(names[j]))", legend=false)
+        # plot!(p[idx(j,2)], x_Normal, y6_Normal;label="ratio of upper theoretical bound")
+
+        ratio_NMInexact = [y1_NMInexact[k]/y1_NMInexact[k-1] for k in range(2,length(y1_NMInexact))]
+        if !isempty(ratio_NMInexact)
+            last_ratio_NMInexact[j] = ratio_NMInexact[end]
+        else
+            last_ratio_NMInexact[j] = NaN
+        end
+        plot!(p[idx(j,2)], x_NMInexact[2:end], ratio_NMInexact;label="NMInexact")
+
+        plot!(p[idx(j,3)], x_NMExact, y2_NMExact; label="ALS NMExact",legend=false,
+        xlabel="Outer iteration", title="Inner iters ($(names[j]))")
+        plot!(p[idx(j,3)], x_NMInexact, y2_NMInexact; label="NMInexact")
+
+        plot!(p[idx(j,4)], x_NMExact, y3_NMExact; label="ALS NMExact",legend=false,
+                xlabel="Outer iteration", title="Time ($(names[j]))")
+        plot!(p[idx(j,4)], x_NMInexact, y3_NMInexact; label="NMInexact")
+
+
+        plot!(p[idx(j,7)], x_NMExact, y7_NMExact; legend=false, label="ALS NMExact",
+              xlabel="Outer iteration", title="Max principal angle between subspaces in degree ($(names[j]))")
+        plot!(p[idx(j,7)], x_NMInexact, y7_NMInexact; legend=false, label="ALS NMInexact")
+
+        
+        plot!(p[idx(j,8)], x9_NMExact, y9_NMExact; legend=false, label="ALS NMExact",
+              xlabel="Outer iteration", title="Norm of gradient ($(names[j]))")
+        plot!(p[idx(j,8)], x9_NMInexact, y9_NMInexact; legend=false, label="ALS NMInexact")
+
+        error_mat_sol_NMExact_NMInexact .= res_NMExact.X1_sol * (res_NMExact.X2_sol') - res_NMInexact.X1_sol * (res_NMInexact.X2_sol')
+        error_norm_sol_NMExact_NMInexact[j] = norm(error_mat_sol_NMExact_NMInexact, 2)
+
+        error_mat_X1_sol_NMExact_NMInexact .= res_NMExact.X1_sol - res_NMInexact.X1_sol
+        error_norm_X1_sol_NMExact_NMInexact[j] = norm(error_mat_X1_sol_NMExact_NMInexact, 2)
+
+        error_mat_X2_sol_NMExact_NMInexact .= res_NMExact.X2_sol - res_NMInexact.X2_sol
+        error_norm_X2_sol_NMExact_NMInexact[j] = norm(error_mat_X2_sol_NMExact_NMInexact, 2)
+        
+    end
+
+    if 1 ≤ r < length(singular_values)
+            Sigma_r_square_ratio = (singular_values[r+1] / singular_values[r])^2
+            Sigma_r_ratio = singular_values[r+1] / singular_values[r]
+            singular_values_r = singular_values[r]
+            singular_values_r1 = singular_values[r+1]
+    else
+            Sigma_r_square_ratio = NaN
+            Sigma_r_ratio = NaN
+            singular_values_r = singular_values[r]
+            singular_values_r1 = NaN
+    end
+
+    num_threads = Threads.nthreads()
+    headers = ["Num of threads","X size","rank","outer_tol", "inner_abstol | inexact_coeff", "inner_reltol","final_error: NMExact | NMInexact", 
+                "total_time: NMExact | NMInexact", "total_inner_iters: NMExactl | NMInexact", "outer_iters: NMExact | NMInexact", "converged: NMExact | NMInexactn", "final_ratio: NMExact | NMInexact", 
+                #"X2tX2_fnorm", 
+                #"last_theoretical_error_bound", "last_theta_max", "last_theoretical_ratio", 
+                "sigma_r", "sigma_{r+1}", "sigma_{r+1}/sigma_r", "(sigma_{r+1}/sigma_r)^2",
+                "|| X_NMExact - X_NMInexact ||_F",
+                "|| X1_NMExact - X1_NMInexact ||_F",
+                "|| X2_NMExact - X2_NMInexact ||_F"]
+    rows = [(
+        string(num_threads),
+        string(size_B),
+        string(resvec_NMExact[j].rank),
+        @sprintf("NMExact = %.1e | NMInexact = %.1e", resvec_NMExact[j].outer_tol, resvec_NMInexact[j].outer_tol),
+        @sprintf("NMExact abstol= %.1e | NMInexact coeff= %.1e", resvec_NMExact[j].inner_abstol, resvec_NMInexact[j].inexact_coeff),
+        @sprintf("NMExact = %.1e | NMInexact = %.1e", resvec_NMExact[j].inner_reltol, resvec_NMInexact[j].inner_reltol),
+        @sprintf("NMExact = %.3e | NMInexact = %.3e", last(resvec_NMExact[j].als_error), last(resvec_NMInexact[j].als_error)),
+        @sprintf("NMExact = %.3e | NMInexact = %.3e", resvec_NMExact[j].total_time_cg, resvec_NMInexact[j].total_time_cg),
+        string("NMExact = ", resvec_NMExact[j].total_inner_iters, "| NMInexact = ", resvec_NMInexact[j].total_inner_iters),
+        string("NMExact = ", resvec_NMExact[j].outer_iters, "| NMInexact = ", resvec_NMInexact[j].outer_iters),
+        string("NMExact = ", resvec_NMExact[j].converged_als, "| NMInexact = ", resvec_NMInexact[j].converged_als),
+        @sprintf("NMExact = %.4f | NMInexact = %.4f", last_ratio_NMExact[j], last_ratio_NMInexact[j]),
+        #@sprintf("%.3e", resvec_Normal[j].X2tX2_fnorm),
+        # @sprintf("%.3e", resvec_Normal[j].last_upper_error_bound),
+        # @sprintf("%.3f", resvec_Normal[j].last_theta_max),
+        # @sprintf("%.4e", resvec_Normal[j].last_theor_ratio),
+        @sprintf("%.4e", singular_values_r),
+        @sprintf("%.4e", singular_values_r1),
+        @sprintf("%.4e", Sigma_r_ratio),
+        @sprintf("%.4e", Sigma_r_square_ratio),
+        @sprintf("%.4e", error_norm_sol_NMExact_NMInexact[j]),
+        @sprintf("%.4e", error_norm_X1_sol_NMExact_NMInexact[j]),
+        @sprintf("%.4e", error_norm_X2_sol_NMExact_NMInexact[j])
+    ) for j in 1:K]
+
+    tplot = Kcol*K + 1
+    plot!(p[tplot], framestyle=:none, legend=false, xlim=(0,1), ylim=(0,1))
+    ncols = length(headers)
+    xgrid = range(0.02, 0.98; length=ncols)
+    if isempty(rows)
+        for (c, h) in enumerate(headers)
+            annotate!(p[tplot], xgrid[c], 0.95, text(h, 16, :black, :center)) 
+        end
+        annotate!(p[tplot], 0.5, 0.5, text("No data available", 16, :center, :red))
+    else
+        nrows = length(rows) + 1
+        ygrid = range(0.90, 0.10; length=nrows)
+        for (c, h) in enumerate(headers)
+            annotate!(p[tplot], xgrid[c], ygrid[1], text(h, 16, :black, :center))
+        end
+        for rrow in range(1, length(rows))
+            vals = rows[rrow]
+            for c in 1:ncols
+                annotate!(p[tplot], xgrid[c], ygrid[rrow+1], text(vals[c], 16, :black, :center))
+            end
+        end
+        annotate!(p[tplot], 0.02, 0.98, text("Matrix size $(size_B) Condition number $(cond_B) Rank = $r  (summary of $K configs)", 11, :black, :left))
+    end
+    rows, cols = size_B
+    matstr = "$(rows)x$(cols)"
+    condstr = @sprintf("cond%.2f", cond_B)
+    rankstr = "rank_$(r)"
+
+    dir = "data/results_html/$(cg_method)/ALS_NMExact_vs_ALS_NMInexact/$(matstr)_$(condstr)/$(rankstr)"
+    mkpath(dir) 
+    outfile_html = "$(dir)/$(outfile)_als_rank_$(r).html"
+    savefig(p, outfile_html)
+
+    return outfile_html
 end
